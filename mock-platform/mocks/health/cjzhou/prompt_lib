@@ -1,0 +1,128 @@
+参考上面的设计准则，Health_mock/LiveClawBench/mock-platform/mocks是已经完整合成的mock，结合这个路径下面的源代码，并调用ctx7 CLI来获取可能会用到的文档或代码库，对Health_mock/.humanize/drafts/health_spec/目录下的spec开展review，提出review意见并询问我直到没有需要改进的review意见，使用中文 
+
+在Health_mock/.humanize/drafts/health_spec/目录下对上面提到的问题中全部修复
+
+设计准则
+# Mock Platform Design Document
+
+## Monorepo Structure
+
+```
+mock-platform/
+├── packages/mock-lib/     # Shared framework library
+├── mocks/                 # Per-service mock implementations
+├── scripts/               # Build and verification scripts
+├── tools/                 # Developer tooling (create-mock)
+├── config/                # Task-to-binary mappings
+└── docs/                  # Internal documentation
+```
+
+## Mock Package Convention
+
+Each mock is a Bun workspace package with:
+- `package.json` — declares `mock-lib: "workspace:*"` and runtime deps
+- `tsconfig.json` — extends root config, includes `src/` and `tests/`
+- `src/index.ts` — entry point exporting factory + server guard
+- `src/types.ts` — domain types
+- `src/data/` — storage and seed logic
+- `src/components/` — TSX page components (HTML-rendered mocks)
+- `src/routes/` — API route handlers
+- `tests/` — `bun:test` test suite
+
+## MockAppV2 Interface
+
+```typescript
+interface MockAppV2 {
+  config: MockConfig;
+  app: OpenAPIApp;
+  openApiInfo?: { title: string; version: string };
+  seed?: () => unknown;
+}
+```
+
+The `seed` property is optional. When present, `startServer()` calls it before booting the HTTP listener. Seed failures are fatal (process exits with code 1).
+
+## File Size Guidelines
+
+- Entry point (`src/index.ts`): <=150 lines (assembly only)
+- Route handler file: <=200 lines
+- Component file: <=300 lines (soft limit; CSS/JS string literals exempt)
+
+## Testing Guidelines
+
+- Tests live in `mocks/<name>/tests/`, not in `src/`
+- Use explicit assertions, not snapshots, for algorithm tests
+- Each test gets a fresh app instance via factory call
+- Call `seed()` explicitly in test setup when needed
+- `seed()` must be idempotent
+
+## Build Pipeline
+
+1. `bun run build` (`scripts/build-all.ts`) — compiles each mock to standalone binary
+2. `bun run check-openapi` — regenerates OpenAPI specs and verifies they are committed
+3. `bun run build:images` (`scripts/build-task-images.ts`) — builds per-task Docker images
+
+## Docker Image Layers
+
+1. **Base** (`liveclawbench-base:latest`) — shared runtime (Python, Bun, Playwright)
+2. **Per-task** (`liveclawbench-{task}-base:latest`) — task-specific mock binaries + startup scripts
+3. **Task** — task-specific apps and environment
+
+## Known Limitations
+
+- Bun does not support TypeScript Project References (`references` field)
+- `parseCliArgs()` does not support boolean flags (only key-value pairs)
+
+
+/humanize:gen-plan —discussion --input Health_mock/.humanize/drafts/health_spec/*.md --output Health_mock/.humanize/plans/
+使用中文，转化之后的开发计划按阶段分为多个文件，要求claude可以直接读取计划进行开发直到完成成品
+依次读取7个md文件，但最后要依据阶段生成多个计划md文件 
+
+我正在wsl for windows环境下面开发一个mock app，现在是计划撰写阶段，目标是撰写claude能够看懂并且不停歇地进行开发的计划。结合\\wsl.localhost\Ubuntu-20.04\home\sherlock\workspace\new-mock\LiveClawBench\mock-platform中已经定义好的技术栈，并利用你的context7的skill，对\\wsl.localhost\Ubuntu-20.04\home\sherlock\workspace\new-mock\LiveClawBench\mock-platform\mocks\health\.humanize\plans进行Human-in-the-loop 的 plan review，最终得到一份 plan review       
+意见。这里 review 意见需要：用 CMT: ... ENDCMT 格式评论到 plan 的对应位置，不要用 html 注释包裹 CMT: … ENDCMT block , CMT block 不要在 fenced code block     
+内。在review的时候使用中文，有需要询问的问题可以问我。
+
+我正在wsl for windows环境下面开发一个mock app，现在是计划撰写阶段，目标是撰写claude能够看懂并且不停歇地进行开发的计划。针对\\wsl.localhost\Ubuntu-20.04\home\sherlock\workspace\new-mock\LiveClawBench\mock-platform\mocks\health\.humanize\plans，我刚使用了claude的/humanize:refine-plan命令对生成的全部plan进行润色，生成的记录change的refine report存储在\\wsl.localhost\Ubuntu-20.04\home\sherlock\workspace\new-mock\LiveClawBench\mock-platform\mocks\health\.humanize\plan_qa。检查是否与你提的问题一致，并且没有引入新问题。如果有，在plan review意见中提出来。这里 review 意见需要：用 CMT: ... ENDCMT 格式评论到 plan 的对应位置，不要用 html 注释包裹 CMT: … ENDCMT block , CMT block 不要在 fenced code block内。在review的时候使用中文，有需要询问的问题可以问我。
+
+/humanize:refine-plan --discussion --input \\wsl.localhost\Ubuntu-20.04\home\sherlock\workspace\new-mock\LiveClawBench\mock-platform\mocks\health\.humanize\plans 对这个目录下面的所有的plan依次进行refine，注意不要一次全部处理超过context，使用中文
+
+我正在wsl for windows环境下面开发一个mock app，之前已经完成spec撰写，保存在mock-dev\Health_mock\.humanize\drafts目录下面，现在是计划撰写阶段，目标是撰写cla  
+ude能够看懂并且不停歇地进行开发的计划。我刚使用了claude的/humanize:refine-plan命令对生成的mock-dev\Health_mock\.humanize\plans\06-frontend.md进行润色，生成的记录change的refine report存储在.humanize\plan_qa\06-frontend-qa.md。检查是否与你提的问题一致，并且没有引入新问题。如果有，在plan review意见中提出来。这里 review 意见需要：用 CMT: ... ENDCMT 格式评论到 plan 的对应位置，不要用 html 注释包裹 CMT: … ENDCMT block , CMT block 不要在 fenced code block内。在review的时候使用中文，有需要询问的问题可以问我。
+
+
+我正在wsl for windows环境下面开发一个mock app，之前已经完成spec撰写，保存在mock-dev\Health_mock\.humanize\drafts目录下面，现在是计划撰写阶段，目标是撰写cla  
+ude能够看懂并且不停歇地进行开发的计划。我刚使用了claude的/humanize:refine-plan命令对生成的mock-dev\Health_mock\.humanize\plans\中的全部plan进行润色，生成的记录change的refine report存储在.humanize\plan_qa\06-frontend-qa.md。检查是否与你提的问题一致，并且没有引入新问题。如果有，在plan review意见中提出来。这里 review 意见需要：用 CMT: ... ENDCMT 格式评论到 plan 的对应位置，不要用 html 注释包裹 CMT: … ENDCMT block , CMT block 不要在 fenced code block内。在review的时候使用中文，有需要询问的问题可以问我。
+
+
+
+我正在wsl for windows环境下面开发一个mock app。现在是计划撰写阶段，目标是撰写cla  
+ude能够看懂并且不停歇地进行开发的计划。我刚使用了claude的/humanize:gen-plan命令对生成的mock-dev\Health_mock\.humanize\plans\中的全部plan进行润色，生。检查是否与你提的问题一致，并且没有引入新问题。如果有，在plan review意见中提出来。这里 review 意见需要：用 CMT: ... ENDCMT 格式评论到 plan 的对应位置，不要用 html 注释包裹 CMT: … ENDCMT block , CMT block 不要在 fenced code block内。在review的时候使用中文，有需要询问的问题可以问我。
+
+
+/humanize:start-rlcr-loop --agent-teams --claude-answer-codex --codex-timeout 7200  —max 20 mock-dev\Health_mock\.humanize\plans\                               
+注意plans是一个目录，里面全部都是plan文件，你需要按照顺序开发所有plan文件的内容。我要休息了，不要问我任何问题，根据你的思考开发 ，实在不会就选择第一个选项，我需要睡醒后直接看到成品。
+
+
+
+
+
+帮我把codex调通，现在已经在config文件里面把可以用的base url和api key写进去了，直到你能够通过调用/humanize:codex这个skill并成功从codex收到消息为止
+
+调用/humanize:ask-codex向codex发送请求，测试codex是否能够正常回应
+
+
+/humanize:refine-plan —discussion --input Health_mock/.humanize/drafts/health_spec/*.md --output Health_mock/.humanize/plans/           
+使用中文
+
+/humanize:refine-plan --discussion --input .humanize/plans/<your_req>_humanize.md
+
+/humanize:start-rlcr-loop --claude-answer-codex --codex-timeout 7200  —max 20 .humanize/plans/<your_req>_humanize.md
+
+/humanize:start-rlcr-loop --agent-teams --claude-answer-codex --codex-timeout 7200  —max 20 mock-dev\Health_mock\.humanize\plans\06-frontend.md
+
+现在mock合成暂时完成了。你需要干另一件事，设计一个health的case，位于 tasks/ 下，符合 harbor
+format。该 case 用于验证 mock service 的正确性，需要在本地测试一下该 case。设计一个只使用当前health的  
+mock service 的简单任务，但尽可能多地使用功能。你可以参考\\wsl.localhost\Ubuntu-20.04\home\sherlock\   
+workspace\new-mock\LiveClawBench-dev\tasks下面别的case来合成。
+
+\\wsl.localhost\Ubuntu-20.04\home\sherlock\workspace\new-mock\LiveClawBench-dev\docs\zh\guide
