@@ -8,19 +8,24 @@ function seededRandom(seed: number) {
   };
 }
 
+function shiftDate(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d + days));
+  return date.toISOString().slice(0, 10);
+}
+
 export function seedDatabase(db: Database): void {
   const count = db.query("SELECT COUNT(*) as c FROM health_daily_snapshot").get() as { c: number };
   if (count.c > 0) return;
 
   const rand = seededRandom(42);
+  const row = db.query("SELECT value FROM system_config WHERE key = 'current_date'").get() as { value: string } | null;
+  const todayStr = row?.value ?? "2026-05-13";
 
   db.exec("BEGIN TRANSACTION");
   try {
-    const today = new Date();
     for (let i = 29; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(d.getDate() - i);
-      const date = d.toISOString().slice(0, 10);
+      const date = shiftDate(todayStr, -i);
 
       const steps = Math.floor(3000 + rand() * 12000);
       const activeEnergy = Math.floor(150 + rand() * 500);
@@ -65,8 +70,6 @@ export function seedDatabase(db: Database): void {
       db.exec(`INSERT INTO allergen (user_id, name, severity, notes)
         VALUES (1, '${a.name}', '${a.severity}', '${a.notes}')`);
     }
-
-    const todayStr = today.toISOString().slice(0, 10);
 
     db.exec(`INSERT INTO medication (user_id, name, display_name, frequency, start_date, notes)
       VALUES (1, 'Vitamin D', NULL, 'daily', '${todayStr}', 'One tablet daily after meals')`);

@@ -58,6 +58,8 @@ export function runMigrations(db: Database): void {
       name TEXT NOT NULL,
       display_name TEXT,
       frequency TEXT NOT NULL DEFAULT 'daily',
+      dose_amount REAL,
+      dose_unit TEXT,
       start_date TEXT NOT NULL,
       end_date TEXT,
       notes TEXT,
@@ -72,8 +74,8 @@ export function runMigrations(db: Database): void {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       medication_id INTEGER NOT NULL,
       time_hhmm TEXT NOT NULL,
-      dose_amount REAL NOT NULL,
-      dose_unit TEXT NOT NULL,
+      dose_amount REAL,
+      dose_unit TEXT,
       label TEXT,
       FOREIGN KEY (medication_id) REFERENCES medication(id) ON DELETE CASCADE
     );
@@ -99,6 +101,11 @@ export function runMigrations(db: Database): void {
     CREATE INDEX IF NOT EXISTS idx_medication_user ON medication(user_id, archived);
     CREATE INDEX IF NOT EXISTS idx_slot_medication ON medication_intake_slot(medication_id);
     CREATE INDEX IF NOT EXISTS idx_dose_log_medication ON medication_dose_log(medication_id, logged_at);
+
+    CREATE TABLE IF NOT EXISTS system_config (
+      key TEXT PRIMARY KEY,
+      value TEXT NOT NULL
+    );
   `);
 }
 
@@ -109,6 +116,7 @@ export function initDb(): Database {
   if (db !== _lastDb) {
     runMigrations(db);
     db.exec(`INSERT OR IGNORE INTO mock_user (id, username, display_name) VALUES (1, 'default', 'Health User')`);
+    db.exec(`INSERT OR IGNORE INTO system_config (key, value) VALUES ('current_date', '2026-05-13')`);
     _lastDb = db;
   }
   return db;

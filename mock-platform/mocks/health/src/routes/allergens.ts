@@ -11,6 +11,7 @@ import {
 } from "../schemas";
 import { errorResponse } from "../utils/errors";
 import { initDb } from "../db";
+import { getNow } from "../utils/clock";
 
 export function registerAllergenRoutes(app: OpenAPIApp) {
   // GET /api/allergens
@@ -83,7 +84,7 @@ export function registerAllergenRoutes(app: OpenAPIApp) {
     if (existing) {
       return errorResponse(c, "CONFLICT" as any, `Allergen "${body.name}" already exists`);
     }
-    const now = new Date().toISOString();
+    const now = getNow();
     const result = db.query(
       "INSERT INTO allergen (user_id, name, severity, notes, created_at, updated_at) VALUES (1, ?, ?, ?, ?, ?) RETURNING *"
     ).get(body.name, body.severity ?? null, body.notes ?? null, now, now) as any;
@@ -151,10 +152,16 @@ export function registerAllergenRoutes(app: OpenAPIApp) {
       const dup = db.query("SELECT id FROM allergen WHERE user_id = 1 AND name = ? AND archived = 0 AND id != ?").get(body.name, id);
       if (dup) return errorResponse(c, "CONFLICT" as any, `Allergen "${body.name}" already exists`);
     }
-    const now = new Date().toISOString();
+    const now = getNow();
     const updated = db.query(
       "UPDATE allergen SET name = ?, severity = ?, notes = ?, updated_at = ? WHERE id = ? RETURNING *"
-    ).get(body.name ?? existing.name, body.severity ?? existing.severity, body.notes ?? existing.notes, now, id);
+    ).get(
+      body.name ?? existing.name,
+      body.severity !== undefined ? body.severity : existing.severity,
+      body.notes !== undefined ? body.notes : existing.notes,
+      now,
+      id,
+    );
     return c.json(updated);
   });
 
@@ -185,7 +192,7 @@ export function registerAllergenRoutes(app: OpenAPIApp) {
     const db = initDb();
     const existing = db.query("SELECT * FROM allergen WHERE id = ? AND user_id = 1 AND archived = 0").get(id);
     if (!existing) return errorResponse(c, "NOT_FOUND", `Allergen with id ${id} not found`);
-    const now = new Date().toISOString();
+    const now = getNow();
     db.query("UPDATE allergen SET archived = 1, archived_at = ? WHERE id = ?").run(now, id);
     return c.json({ success: true, archived_at: now });
   });

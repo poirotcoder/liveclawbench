@@ -15,6 +15,7 @@ import {
 } from "../schemas";
 import { errorResponse } from "../utils/errors";
 import { initDb } from "../db";
+import { getToday } from "../utils/clock";
 
 const CATEGORIES = [
   { name: "Fitness", icon: "fitness", metrics: ["steps", "active_energy_kcal"] },
@@ -61,7 +62,7 @@ export function registerHealthRoutes(app: OpenAPIApp) {
 
   app.openApiRoute(snapshotRoute, (c) => {
     const { date } = c.req.valid("query");
-    const targetDate = date || new Date().toISOString().slice(0, 10);
+    const targetDate = date || getToday();
     const db = initDb();
     const row = db.query("SELECT * FROM health_daily_snapshot WHERE user_id = 1 AND date = ?").get(targetDate) as any;
     if (!row) {

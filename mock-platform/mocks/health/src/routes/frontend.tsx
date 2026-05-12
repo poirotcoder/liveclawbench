@@ -1,8 +1,9 @@
 /** @jsxImportSource hono/jsx */
 import type { OpenAPIApp } from "mock-lib";
 import { initDb } from "../db";
+import { getToday } from "../utils/clock";
 
-function Layout({ title, children }: { title: string; children: any }) {
+function Layout({ title, today, children }: { title: string; today?: string; children: any }) {
   return (
     <html lang="en">
       <head>
@@ -11,7 +12,7 @@ function Layout({ title, children }: { title: string; children: any }) {
         <title>{title} - Health Manager</title>
         <link rel="stylesheet" href="/static/styles.css" />
       </head>
-      <body>
+      <body data-today={today || ""}>
         <nav class="navbar">
           <div class="nav-brand">Health Manager</div>
           <div class="nav-links">
@@ -75,7 +76,7 @@ function shiftDate(dateStr: string, days: number): string {
 export function registerFrontendRoutes(app: OpenAPIApp) {
   app.get("/", (c) => {
     const db = initDb();
-    const today = formatDate(new Date());
+    const today = getToday();
     const queryDate = c.req.query("date") || today;
     const snapshot = db.query(
       "SELECT * FROM health_daily_snapshot WHERE user_id = 1 AND date = ?"
@@ -108,7 +109,7 @@ export function registerFrontendRoutes(app: OpenAPIApp) {
     ).all(weekStart, queryDate) as any[];
 
     return c.html(
-      <Layout title="Dashboard">
+      <Layout title="Dashboard" today={today}>
         <div class="page-header">
           <h1>Health Dashboard</h1>
           <div class="date-nav">
@@ -164,7 +165,7 @@ export function registerFrontendRoutes(app: OpenAPIApp) {
                 <div class="med-card" key={m.id}>
                   <div class="med-header">
                     <strong>{m.display_name || m.name}</strong>
-                    <span class={`freq-badge freq-${m.frequency}`}>{m.frequency === "daily" ? "Daily" : "As Needed"}</span>
+                    <span class={`freq-badge freq-${m.frequency}`}>{m.frequency === "daily" ? "Daily" : m.frequency === "every_two_days" ? "Every Two Days" : m.frequency === "weekly" ? "Weekly" : m.frequency === "monthly" ? "Monthly" : m.frequency === "as_needed" ? "As Needed" : "Other"}</span>
                   </div>
                   {(m.slots as any[]).map((s: any) => {
                     const logged = (m.todayLogs as any[]).some((l: any) => l.slot_id === s.id);
@@ -212,7 +213,7 @@ export function registerFrontendRoutes(app: OpenAPIApp) {
   // Browse categories page
   app.get("/browse", (c) => {
     const db = initDb();
-    const today = formatDate(new Date());
+    const today = getToday();
     const weekStart = shiftDate(today, -6);
 
     const categoriesWithData = CATEGORIES.map(cat => {
@@ -226,7 +227,7 @@ export function registerFrontendRoutes(app: OpenAPIApp) {
     });
 
     return c.html(
-      <Layout title="Browse">
+      <Layout title="Browse" today={today}>
         <div class="page-header">
           <h1>Health Categories</h1>
         </div>
@@ -262,11 +263,11 @@ export function registerFrontendRoutes(app: OpenAPIApp) {
     const metricType = c.req.param("type");
     const meta = METRIC_LABELS[metricType];
     if (!meta) {
-      return c.html(<Layout title="Not Found"><div class="empty-state"><p>Unknown metric type</p></div></Layout>);
+      return c.html(<Layout title="Not Found" today={getToday()}><div class="empty-state"><p>Unknown metric type</p></div></Layout>);
     }
 
     const db = initDb();
-    const today = formatDate(new Date());
+    const today = getToday();
     const daysParam = c.req.query("days") || "7";
     const days = parseInt(daysParam, 10) || 7;
     const startDate = shiftDate(today, -(days - 1));
@@ -298,7 +299,7 @@ export function registerFrontendRoutes(app: OpenAPIApp) {
     }
 
     return c.html(
-      <Layout title={meta.label}>
+      <Layout title={meta.label} today={today}>
         <div class="page-header">
           <h1>{meta.icon} {meta.label}</h1>
           <a href="/browse" class="btn btn-sm">Back</a>
@@ -370,12 +371,13 @@ export function registerFrontendRoutes(app: OpenAPIApp) {
 
   app.get("/allergens", (c) => {
     const db = initDb();
+    const today = getToday();
     const allergens = db.query(
       "SELECT * FROM allergen WHERE user_id = 1 AND archived = 0 ORDER BY id DESC"
     ).all() as any[];
 
     return c.html(
-      <Layout title="Allergens">
+      <Layout title="Allergens" today={today}>
         <div class="page-header">
           <h1>Allergen Management</h1>
           <button class="btn btn-primary" id="add-allergen-btn">Add Allergen</button>
@@ -448,6 +450,7 @@ export function registerFrontendRoutes(app: OpenAPIApp) {
 
   app.get("/medications", (c) => {
     const db = initDb();
+    const today = getToday();
     const meds = db.query(
       "SELECT * FROM medication WHERE user_id = 1 AND archived = 0 ORDER BY id DESC"
     ).all() as any[];
@@ -457,7 +460,7 @@ export function registerFrontendRoutes(app: OpenAPIApp) {
     });
 
     return c.html(
-      <Layout title="Medications">
+      <Layout title="Medications" today={today}>
         <div class="page-header">
           <h1>Medications</h1>
           <button class="btn btn-primary" id="add-med-btn">Add Medication</button>
@@ -478,15 +481,32 @@ export function registerFrontendRoutes(app: OpenAPIApp) {
           </div>
           <div class="form-row">
             <div class="form-group">
-              <label>Frequency *</label>
+              <label>Frequency</label>
               <select id="med-frequency">
                 <option value="daily">Daily</option>
+                <option value="every_two_days">Every Two Days</option>
+                <option value="weekly">Weekly</option>
+                <option value="monthly">Monthly</option>
                 <option value="as_needed">As Needed</option>
+                <option value="other">Other</option>
               </select>
             </div>
             <div class="form-group">
+              <label>Dose</label>
+              <div class="dose-input-row">
+                <input type="number" id="med-dose-amount" placeholder="Amount" step="0.5" min="0" value="0" />
+                <input type="text" id="med-dose-unit" placeholder="Unit" value="tablet" />
+              </div>
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
               <label>Start Date *</label>
               <input type="date" id="med-start-date" />
+            </div>
+            <div class="form-group">
+              <label>End Date</label>
+              <input type="date" id="med-end-date" />
             </div>
           </div>
           <div class="form-group">
@@ -522,7 +542,10 @@ export function registerFrontendRoutes(app: OpenAPIApp) {
                       data-id={m.id} data-name={m.name}
                       data-display-name={m.display_name || ""}
                       data-frequency={m.frequency}
+                      data-dose-amount={m.dose_amount || ""}
+                      data-dose-unit={m.dose_unit || ""}
                       data-start-date={m.start_date}
+                      data-end-date={m.end_date || ""}
                       data-notes={m.notes || ""}
                       data-slots={JSON.stringify(m.slots)}>Edit</button>
                     <button class="btn btn-sm btn-danger delete-med-btn" data-id={m.id}>Discontinue</button>
@@ -530,9 +553,11 @@ export function registerFrontendRoutes(app: OpenAPIApp) {
                 </div>
                 <div class="med-meta">
                   <span class={`freq-badge freq-${m.frequency}`}>
-                    {m.frequency === "daily" ? "Daily" : "As Needed"}
+                    {m.frequency === "daily" ? "Daily" : m.frequency === "every_two_days" ? "Every Two Days" : m.frequency === "weekly" ? "Weekly" : m.frequency === "monthly" ? "Monthly" : m.frequency === "as_needed" ? "As Needed" : "Other"}
                   </span>
+                  {m.dose_amount && <span class="dose-badge">{m.dose_amount} {m.dose_unit}</span>}
                   <span>Started {m.start_date}</span>
+                  {m.end_date && <span>Until {m.end_date}</span>}
                 </div>
                 {m.notes && <p class="med-notes">{m.notes}</p>}
                 {(m.slots as any[]).length > 0 && (

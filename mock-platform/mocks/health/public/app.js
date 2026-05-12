@@ -112,10 +112,12 @@
       var editId = document.getElementById("allergen-edit-id").value;
       var name = document.getElementById("allergen-name").value.trim();
       if (!name) { toast("Name is required", "error"); return; }
+      var severityVal = document.getElementById("allergen-severity").value;
+      var notesVal = document.getElementById("allergen-notes").value;
       var body = {
         name: name,
-        severity: document.getElementById("allergen-severity").value || undefined,
-        notes: document.getElementById("allergen-notes").value || undefined
+        severity: severityVal ? severityVal : (editId ? null : undefined),
+        notes: notesVal ? notesVal : (editId ? null : undefined)
       };
       try {
         if (editId) {
@@ -154,7 +156,7 @@
     div.className = "slot-input-row";
     div.innerHTML =
       '<input type="time" class="slot-time-input" value="' + (slot ? slot.time_hhmm : "08:00") + '" />' +
-      '<input type="number" class="slot-amount-input" placeholder="Dose" step="0.5" min="0.1" value="' + (slot ? slot.dose_amount : "1") + '" />' +
+      '<input type="number" class="slot-amount-input" placeholder="Dose" step="0.5" min="0" value="' + (slot ? slot.dose_amount : "0") + '" />' +
       '<input type="text" class="slot-unit-input" placeholder="Unit" value="' + (slot ? slot.dose_unit : "tablet") + '" />' +
       '<input type="text" class="slot-label-input" placeholder="Label (optional)" value="' + (slot && slot.label ? slot.label : "") + '" />' +
       '<button type="button" class="btn btn-sm btn-danger remove-slot-btn">×</button>';
@@ -168,11 +170,13 @@
       document.getElementById("med-name").value = "";
       document.getElementById("med-display-name").value = "";
       document.getElementById("med-frequency").value = "daily";
-      document.getElementById("med-start-date").value = new Date().toISOString().slice(0, 10);
+      document.getElementById("med-dose-amount").value = "0";
+      document.getElementById("med-dose-unit").value = "tablet";
+      document.getElementById("med-start-date").value = document.body.dataset.today || new Date().toISOString().slice(0, 10);
+      document.getElementById("med-end-date").value = "";
       document.getElementById("med-notes").value = "";
       document.getElementById("med-form-title").textContent = "Add Medication";
       slotsContainer.innerHTML = "";
-      slotsContainer.appendChild(createSlotRow());
       medForm.classList.remove("hidden");
     });
   }
@@ -195,13 +199,16 @@
       document.getElementById("med-name").value = this.dataset.name;
       document.getElementById("med-display-name").value = this.dataset.displayName;
       document.getElementById("med-frequency").value = this.dataset.frequency;
+      document.getElementById("med-dose-amount").value = this.dataset.doseAmount || "";
+      document.getElementById("med-dose-unit").value = this.dataset.doseUnit || "";
       document.getElementById("med-start-date").value = this.dataset.startDate;
+      document.getElementById("med-end-date").value = this.dataset.endDate || "";
       document.getElementById("med-notes").value = this.dataset.notes;
       document.getElementById("med-form-title").textContent = "Edit Medication";
       slotsContainer.innerHTML = "";
       var slots = JSON.parse(this.dataset.slots || "[]");
       slots.forEach(function(s) { slotsContainer.appendChild(createSlotRow(s)); });
-      if (slots.length === 0) slotsContainer.appendChild(createSlotRow());
+      // Allow empty slots - don't force adding one
       medForm.classList.remove("hidden");
     });
   });
@@ -214,19 +221,25 @@
       var slots = [];
       slotsContainer.querySelectorAll(".slot-input-row").forEach(function(row) {
         var time = row.querySelector(".slot-time-input").value;
-        var amount = parseFloat(row.querySelector(".slot-amount-input").value);
+        var amountVal = row.querySelector(".slot-amount-input").value;
         var unit = row.querySelector(".slot-unit-input").value.trim();
-        if (time && amount && unit) {
-          slots.push({ time_hhmm: time, dose_amount: amount, dose_unit: unit, label: row.querySelector(".slot-label-input").value.trim() || undefined });
+        if (time) {
+          slots.push({ time_hhmm: time, dose_amount: amountVal !== "" ? parseFloat(amountVal) : undefined, dose_unit: unit || undefined, label: row.querySelector(".slot-label-input").value.trim() || undefined });
         }
       });
+      var doseAmountVal = document.getElementById("med-dose-amount").value;
+      var doseAmount = doseAmountVal !== "" ? parseFloat(doseAmountVal) : null;
+      var doseUnit = document.getElementById("med-dose-unit").value.trim() || null;
       var body = {
         name: name,
         display_name: document.getElementById("med-display-name").value.trim() || undefined,
         frequency: document.getElementById("med-frequency").value,
+        dose_amount: editId ? doseAmount : (doseAmount !== null ? doseAmount : undefined),
+        dose_unit: editId ? doseUnit : (doseUnit || undefined),
         start_date: document.getElementById("med-start-date").value,
+        end_date: document.getElementById("med-end-date").value || undefined,
         notes: document.getElementById("med-notes").value.trim() || undefined,
-        slots: slots.length > 0 ? slots : undefined
+        slots: slots
       };
       try {
         if (editId) {

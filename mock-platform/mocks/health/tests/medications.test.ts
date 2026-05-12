@@ -1,5 +1,6 @@
 import { describe, expect, test, beforeEach, afterEach } from "bun:test";
 import { createTestApp, jsonRequest, putRequest, deleteRequest, cleanup } from "./setup";
+import { getToday } from "../src/utils/clock";
 
 const DAILY_MED = {
   name: "Aspirin",
@@ -46,18 +47,18 @@ describe("Medications API", () => {
     expect(body.slots.length).toBe(0);
   });
 
-  test("POST /api/medications rejects weekly frequency", async () => {
+  test("POST /api/medications accepts weekly frequency", async () => {
     const res = await jsonRequest(app, "/api/medications", {
-      name: "Test",
+      name: "Test Weekly",
       frequency: "weekly",
       start_date: "2025-01-01",
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.message).toContain("not supported");
+    expect(body.frequency).toBe("weekly");
   });
 
-  test("POST /api/medications rejects custom frequency", async () => {
+  test("POST /api/medications rejects invalid frequency", async () => {
     const res = await jsonRequest(app, "/api/medications", {
       name: "Test",
       frequency: "custom",
@@ -66,35 +67,35 @@ describe("Medications API", () => {
     expect(res.status).toBe(400);
   });
 
-  test("POST /api/medications rejects daily without slots", async () => {
+  test("POST /api/medications accepts daily without slots", async () => {
     const res = await jsonRequest(app, "/api/medications", {
-      name: "Test",
+      name: "Test No Slots",
       frequency: "daily",
       start_date: "2025-01-01",
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.message).toContain("slot");
+    expect(body.slots).toEqual([]);
   });
 
-  test("POST /api/medications rejects daily with empty slots array", async () => {
+  test("POST /api/medications accepts daily with empty slots array", async () => {
     const res = await jsonRequest(app, "/api/medications", {
-      name: "Test",
+      name: "Test Empty Slots",
       frequency: "daily",
       start_date: "2025-01-01",
       slots: [],
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(201);
   });
 
-  test("POST /api/medications rejects as_needed with slots", async () => {
+  test("POST /api/medications accepts as_needed with slots", async () => {
     const res = await jsonRequest(app, "/api/medications", {
       ...AS_NEEDED_MED,
       slots: [{ time_hhmm: "08:00", dose_amount: 100, dose_unit: "mg" }],
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(201);
     const body = await res.json();
-    expect(body.message).toContain("slot");
+    expect(body.slots.length).toBe(1);
   });
 
   test("POST /api/medications with end_date", async () => {
@@ -234,14 +235,16 @@ describe("Medications API", () => {
     expect(body.slots[0].time_hhmm).toBe("12:00");
   });
 
-  test("PUT /api/medications/{id} rejects weekly frequency", async () => {
+  test("PUT /api/medications/{id} accepts weekly frequency", async () => {
     const createRes = await jsonRequest(app, "/api/medications", DAILY_MED);
     const { id } = await createRes.json();
 
     const res = await putRequest(app, `/api/medications/${id}`, {
       frequency: "weekly",
     });
-    expect(res.status).toBe(400);
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.frequency).toBe("weekly");
   });
 
   test("PUT /api/medications/{id} returns 404 for nonexistent", async () => {
@@ -411,7 +414,7 @@ describe("Medications API", () => {
       status: "taken",
     });
 
-    const today = new Date().toISOString().slice(0, 10);
+    const today = getToday();
     const res = await app.request(
       `/api/medications/${med.id}/logs?start_date=${today}&end_date=${today}`
     );

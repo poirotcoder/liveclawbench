@@ -147,8 +147,8 @@ const UpdateAllergenBodySchema = z.object({
 
 // --- Medications ---
 
-const FrequencySchema = z.enum(["daily", "as_needed", "weekly", "custom"]);
-const MvpFrequencySchema = z.enum(["daily", "as_needed"]);
+const FrequencySchema = z.enum(["daily", "every_two_days", "weekly", "monthly", "as_needed", "other"]);
+const MvpFrequencySchema = z.enum(["daily", "every_two_days", "weekly", "monthly", "as_needed", "other"]);
 const LogStatusSchema = z.enum(["taken", "skipped", "pending"]);
 
 const MedicationSlotSchema = z.object({
@@ -166,6 +166,8 @@ const MedicationSchema = z.object({
   name: z.string(),
   display_name: z.string().nullable(),
   frequency: FrequencySchema,
+  dose_amount: z.number().nullable(),
+  dose_unit: z.string().nullable(),
   start_date: z.string(),
   end_date: z.string().nullable(),
   notes: z.string().nullable(),
@@ -178,8 +180,8 @@ const MedicationSchema = z.object({
 
 const SlotInputSchema = z.object({
   time_hhmm: z.string().regex(/^\d{2}:\d{2}$/, "time_hhmm must be HH:MM format"),
-  dose_amount: z.number().positive(),
-  dose_unit: z.string().min(1),
+  dose_amount: z.number().nonnegative().optional(),
+  dose_unit: z.string().optional(),
   label: z.string().optional(),
 });
 
@@ -187,6 +189,8 @@ const CreateMedicationBodySchema = z.object({
   name: z.string().min(1, "name is required"),
   display_name: z.string().optional(),
   frequency: FrequencySchema,
+  dose_amount: z.number().nonnegative().optional(),
+  dose_unit: z.string().min(1).optional(),
   start_date: DateStringSchema,
   end_date: DateStringSchema.optional(),
   notes: z.string().optional(),
@@ -197,6 +201,9 @@ const UpdateMedicationBodySchema = z.object({
   name: z.string().min(1).optional(),
   display_name: z.string().nullable().optional(),
   frequency: FrequencySchema.optional(),
+  dose_amount: z.number().nonnegative().nullable().optional(),
+  dose_unit: z.string().min(1).nullable().optional(),
+  start_date: DateStringSchema.optional(),
   end_date: DateStringSchema.nullable().optional(),
   notes: z.string().nullable().optional(),
   slots: z.array(SlotInputSchema).optional(),
@@ -224,7 +231,7 @@ const DoseLogSchema = z.object({
 const CreateDoseLogBodySchema = z.object({
   slot_id: z.number().optional(),
   status: z.enum(["taken", "skipped"]),
-  log_dose_amount: z.number().positive().optional(),
+  log_dose_amount: z.number().nonnegative().optional(),
   log_dose_unit: z.string().min(1).optional(),
   date: DateStringSchema.optional(),
 });

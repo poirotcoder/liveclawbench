@@ -18,6 +18,7 @@ import { errorResponse } from "../utils/errors";
 import { validateMedicationInput } from "../services/medication-validator";
 import { ValidationError } from "../utils/errors";
 import { initDb } from "../db";
+import { getToday, getNow } from "../utils/clock";
 
 function getMedicationWithSlots(id: number) {
   const db = initDb();
@@ -103,15 +104,15 @@ export function registerMedicationRoutes(app: OpenAPIApp) {
       throw e;
     }
     const db = initDb();
-    const now = new Date().toISOString();
+    const now = getNow();
     const med = db.query(
-      "INSERT INTO medication (user_id, name, display_name, frequency, start_date, end_date, notes, created_at, updated_at) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *"
-    ).get(body.name, body.display_name ?? null, body.frequency, body.start_date, body.end_date ?? null, body.notes ?? null, now, now) as any;
+      "INSERT INTO medication (user_id, name, display_name, frequency, dose_amount, dose_unit, start_date, end_date, notes, created_at, updated_at) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *"
+    ).get(body.name, body.display_name ?? null, body.frequency, body.dose_amount ?? null, body.dose_unit ?? null, body.start_date, body.end_date ?? null, body.notes ?? null, now, now) as any;
 
     const slots = (body.slots ?? []).map(s => {
       return db.query(
         "INSERT INTO medication_intake_slot (medication_id, time_hhmm, dose_amount, dose_unit, label) VALUES (?, ?, ?, ?, ?) RETURNING *"
-      ).get(med.id, s.time_hhmm, s.dose_amount, s.dose_unit, s.label ?? null);
+      ).get(med.id, s.time_hhmm, s.dose_amount ?? null, s.dose_unit ?? null, s.label ?? null);
     });
 
     return c.json({ ...med, slots }, 201);
@@ -144,7 +145,7 @@ export function registerMedicationRoutes(app: OpenAPIApp) {
 
   app.openApiRoute(todayRoute, (c) => {
     const { date } = c.req.valid("query");
-    const targetDate = date || new Date().toISOString().slice(0, 10);
+    const targetDate = date || getToday();
     const db = initDb();
     const meds = db.query(
       "SELECT * FROM medication WHERE user_id = 1 AND archived = 0 AND start_date <= ? AND (end_date IS NULL OR end_date >= ?)"
@@ -209,31 +210,29 @@ export function registerMedicationRoutes(app: OpenAPIApp) {
   app.openApiRoute(updateRoute, (c) => {
     const { id } = c.req.valid("param");
     const body = c.req.valid("json");
-    if (body.frequency === "weekly" || body.frequency === "custom") {
-      return errorResponse(c, "UNSUPPORTED_FREQUENCY",
-        `Frequency "${body.frequency}" is not supported in MVP`);
-    }
     const db = initDb();
     const existing = db.query("SELECT * FROM medication WHERE id = ? AND user_id = 1").get(id) as any;
     if (!existing) return errorResponse(c, "NOT_FOUND", `Medication with id ${id} not found`);
-    const now = new Date().toISOString();
+    const now = getNow();
     db.query(
-      "UPDATE medication SET name = ?, display_name = ?, frequency = ?, start_date = ?, end_date = ?, notes = ?, updated_at = ? WHERE id = ?"
+      "UPDATE medication SET name = ?, display_name = ?, frequency = ?, dose_amount = ?, dose_unit = ?, start_date = ?, end_date = ?, notes = ?, updated_at = ? WHERE id = ?"
     ).run(
       body.name ?? existing.name,
       body.display_name ?? existing.display_name,
       body.frequency ?? existing.frequency,
+      body.dose_amount !== undefined ? body.dose_amount : existing.dose_amount,
+      body.dose_unit !== undefined ? body.dose_unit : existing.dose_unit,
       body.start_date ?? existing.start_date,
       body.end_date ?? existing.end_date,
       body.notes ?? existing.notes,
       now, id
     );
-    if (body.slots) {
+    if (body.slots !== undefined) {
       db.query("DELETE FROM medication_intake_slot WHERE medication_id = ?").run(id);
       for (const s of body.slots) {
         db.query(
           "INSERT INTO medication_intake_slot (medication_id, time_hhmm, dose_amount, dose_unit, label) VALUES (?, ?, ?, ?, ?)"
-        ).run(id, s.time_hhmm, s.dose_amount, s.dose_unit, s.label ?? null);
+        ).run(id, s.time_hhmm, s.dose_amount ?? null, s.dose_unit ?? null, s.label ?? null);
       }
     }
     return c.json(getMedicationWithSlots(id));
@@ -266,7 +265,7 @@ export function registerMedicationRoutes(app: OpenAPIApp) {
     const db = initDb();
     const existing = db.query("SELECT * FROM medication WHERE id = ? AND user_id = 1 AND archived = 0").get(id);
     if (!existing) return errorResponse(c, "NOT_FOUND", `Medication with id ${id} not found`);
-    const now = new Date().toISOString();
+    const now = getNow();
     db.query("UPDATE medication SET archived = 1, archived_at = ? WHERE id = ?").run(now, id);
     return c.json({ success: true, archived_at: now });
   });
@@ -314,7 +313,7 @@ export function registerMedicationRoutes(app: OpenAPIApp) {
       const slot = db.query("SELECT * FROM medication_intake_slot WHERE id = ? AND medication_id = ?").get(body.slot_id, id);
       if (!slot) return errorResponse(c, "NOT_FOUND", `Slot ${body.slot_id} not found for medication ${id}`);
     }
-    const now = new Date().toISOString();
+    const now = getNow();
     const log = db.query(
       "INSERT INTO medication_dose_log (medication_id, slot_id, logged_at, status, log_dose_amount, log_dose_unit, notes, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING *"
     ).get(id, body.slot_id ?? null, body.logged_at ?? now, body.status ?? "taken", body.log_dose_amount ?? null, body.log_dose_unit ?? null, body.notes ?? null, now, now);
@@ -348,7 +347,7 @@ export function registerMedicationRoutes(app: OpenAPIApp) {
     const db = initDb();
     const existing = db.query("SELECT * FROM medication_dose_log WHERE id = ? AND medication_id = ?").get(logId, id);
     if (!existing) return errorResponse(c, "NOT_FOUND", `Dose log ${logId} not found`);
-    const now = new Date().toISOString();
+    const now = getNow();
     const updated = db.query(
       "UPDATE medication_dose_log SET status = COALESCE(?, status), notes = COALESCE(?, notes), updated_at = ? WHERE id = ? RETURNING *"
     ).get(body.status ?? null, body.notes ?? null, now, logId);

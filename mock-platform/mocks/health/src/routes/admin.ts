@@ -8,6 +8,7 @@ import {
 } from "../schemas";
 import { errorResponse } from "../utils/errors";
 import { initDb } from "../db";
+import { getNow } from "../utils/clock";
 
 function isAdminAllowed(): boolean {
   return (
@@ -115,7 +116,7 @@ export function registerAdminRoutes(app: OpenAPIApp) {
     }
     const { medications } = c.req.valid("json");
     const db = initDb();
-    const now = new Date().toISOString();
+    const now = getNow();
     let created = 0;
     for (const m of medications) {
       const med = db.query(
