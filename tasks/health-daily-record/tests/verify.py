@@ -31,9 +31,7 @@ def query_db(query, params=()):
 
 # Check 1: Allergen "Crab" with severity "mild"
 try:
-    allergens = query_db(
-        "SELECT name, severity FROM allergen WHERE archived = 0"
-    )
+    allergens = query_db("SELECT name, severity FROM allergen WHERE archived = 0")
     found = False
     for a in allergens:
         name_lower = a["name"].lower()
@@ -67,7 +65,7 @@ try:
     if found_med:
         slots = query_db(
             "SELECT time_hhmm FROM medication_intake_slot WHERE medication_id = ?",
-            (found_med["id"],)
+            (found_med["id"],),
         )
         times = sorted([s["time_hhmm"] for s in slots])
 
@@ -76,13 +74,17 @@ try:
             has_1700 = any("17:00" in t for t in times)
             if has_0900 and has_1700:
                 points += 1.0
-                print(f"PASS: Medication 'Theraflu' found with slots at 09:00 and 17:00")
+                print("PASS: Medication 'Theraflu' found with slots at 09:00 and 17:00")
             else:
                 points += 0.5
-                print(f"PARTIAL: Medication found but slots are {times}, expected 09:00 and 17:00")
+                print(
+                    f"PARTIAL: Medication found but slots are {times}, expected 09:00 and 17:00"
+                )
         else:
             points += 0.5
-            print(f"PARTIAL: Medication found but frequency={found_med['frequency']}, slots={len(slots)}")
+            print(
+                f"PARTIAL: Medication found but frequency={found_med['frequency']}, slots={len(slots)}"
+            )
     else:
         print("FAIL: Medication 'Theraflu' not found")
 except Exception as e:
@@ -100,7 +102,7 @@ try:
         WHERE metric_type = 'active_energy_kcal'
         AND date >= ? AND date <= ?
         """,
-        (start, end)
+        (start, end),
     )
     values = [m["value"] for m in metrics]
     actual_max = max(values) if values else None
@@ -109,6 +111,7 @@ try:
         content = f.read().strip()
 
     import re
+
     numbers = re.findall(r"[\d.]+", content)
 
     if numbers and actual_max is not None:

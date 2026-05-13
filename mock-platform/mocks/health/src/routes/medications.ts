@@ -354,6 +354,35 @@ export function registerMedicationRoutes(app: OpenAPIApp) {
     return c.json(updated);
   });
 
+  // DELETE /api/medications/{id}/log/{logId}
+  const deleteLogRoute = createRoute({
+    method: "delete",
+    path: "/api/medications/{id}/log/{logId}",
+    summary: "Delete a dose log",
+    request: {
+      params: z.object({ id: z.coerce.number().int(), logId: z.coerce.number().int() }),
+    },
+    responses: {
+      200: {
+        content: { "application/json": { schema: z.object({ success: z.boolean() }) } },
+        description: "Deleted",
+      },
+      404: {
+        content: { "application/json": { schema: ErrorResponseSchema } },
+        description: "Not found",
+      },
+    },
+  });
+
+  app.openApiRoute(deleteLogRoute, (c) => {
+    const { id, logId } = c.req.valid("param");
+    const db = initDb();
+    const existing = db.query("SELECT * FROM medication_dose_log WHERE id = ? AND medication_id = ?").get(logId, id);
+    if (!existing) return errorResponse(c, "NOT_FOUND", `Dose log ${logId} not found`);
+    db.query("DELETE FROM medication_dose_log WHERE id = ?").run(logId);
+    return c.json({ success: true });
+  });
+
   // GET /api/medications/{id}/logs
   const logsHistoryRoute = createRoute({
     method: "get",

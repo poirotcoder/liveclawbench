@@ -18,6 +18,13 @@ export function runMigrations(db: Database): void {
       active_energy_kcal REAL,
       sleep_hours REAL,
       sleep_quality REAL,
+      light_sleep_hours REAL,
+      deep_sleep_hours REAL,
+      rem_sleep_hours REAL,
+      low_intensity_min REAL,
+      medium_intensity_min REAL,
+      high_intensity_min REAL,
+      total_activity_min REAL,
       resting_heart_rate_bpm INTEGER,
       avg_heart_rate_bpm INTEGER,
       weight_kg REAL,
@@ -107,6 +114,15 @@ export function runMigrations(db: Database): void {
       value TEXT NOT NULL
     );
   `);
+
+  // Add new columns to existing databases that predate this schema
+  for (const col of [
+    "light_sleep_hours REAL", "deep_sleep_hours REAL", "rem_sleep_hours REAL",
+    "low_intensity_min REAL", "medium_intensity_min REAL", "high_intensity_min REAL",
+    "total_activity_min REAL",
+  ]) {
+    try { db.exec(`ALTER TABLE health_daily_snapshot ADD COLUMN ${col}`); } catch (_) {}
+  }
 }
 
 let _lastDb: Database | null = null;
@@ -117,6 +133,7 @@ export function initDb(): Database {
     runMigrations(db);
     db.exec(`INSERT OR IGNORE INTO mock_user (id, username, display_name) VALUES (1, 'default', 'Health User')`);
     db.exec(`INSERT OR IGNORE INTO system_config (key, value) VALUES ('current_date', '2026-05-13')`);
+    db.exec(`INSERT OR IGNORE INTO system_config (key, value) VALUES ('current_time', '16:42')`);
     _lastDb = db;
   }
   return db;

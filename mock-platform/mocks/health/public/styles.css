@@ -394,9 +394,14 @@ body {
   font-size: 14px;
   font-weight: 500;
   color: var(--text-muted);
+  background: transparent;
+  box-shadow: none;
   transition: all 0.15s;
+  cursor: pointer;
 }
+a.period-tab, a.period-tab:visited { color: var(--text-muted); }
 .period-tab.active { background: var(--surface); color: var(--text); box-shadow: var(--shadow); }
+a.period-tab.active, a.period-tab.active:visited { color: var(--text); }
 .period-tab:hover:not(.active) { color: var(--text); }
 
 /* Detail page */
@@ -516,3 +521,75 @@ body {
 .category-chip:hover { border-color: var(--primary); transform: translateY(-1px); box-shadow: var(--shadow-md); }
 .category-chip-icon { font-size: 20px; }
 .category-chip-name { white-space: nowrap; }
+
+/* Date range picker */
+.date-range-picker {
+  display: none;
+  margin-bottom: 20px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+.date-range-picker.visible { display: block; }
+.chart-limit-notice { margin-top: 8px; font-size: 12px; color: var(--text-muted); text-align: center; }
+.date-range-form {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.date-range-form label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+.date-range-form input[type="date"] {
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 14px;
+}
+#custom-range-tab { cursor: pointer; }
+
+/* Sort controls */
+.sort-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* Next reminder */
+.next-med-time {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--primary);
+  padding: 6px 0 10px;
+}
+.next-reminder {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--primary);
+  margin-bottom: 8px;
+  padding: 4px 0;
+}
+.reminder-icon { font-size: 14px; }
+
+/* Slot actions (taken + cancel) */
+.slot-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}

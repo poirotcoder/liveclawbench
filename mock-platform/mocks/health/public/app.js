@@ -16,6 +16,12 @@
     return data;
   }
 
+  function reloadMedPage() {
+    var params = new URLSearchParams(window.location.search);
+    var sort = params.get("sort") || "time";
+    window.location.href = "/medications?sort=" + sort;
+  }
+
   // --- Bar chart rendering ---
   function renderBarChart(container, values, labels, unit) {
     if (!container || !values || values.length === 0) return;
@@ -72,6 +78,34 @@
       } catch(e) { toast(e.message, "error"); }
     });
   });
+
+  // --- Cancel dose (dashboard) ---
+  document.querySelectorAll(".cancel-dose-btn").forEach(function(btn) {
+    btn.addEventListener("click", async function() {
+      var medId = this.dataset.medId;
+      var logId = this.dataset.logId;
+      if (!confirm("Cancel this dose log?")) return;
+      try {
+        await api("DELETE", "/api/medications/" + medId + "/log/" + logId);
+        toast("Dose cancelled");
+        setTimeout(function() { location.reload(); }, 500);
+      } catch(e) { toast(e.message, "error"); }
+    });
+  });
+
+  // --- Custom date range tab toggle ---
+  var customRangeTab = document.getElementById("custom-range-tab");
+  var dateRangePicker = document.getElementById("date-range-picker");
+  if (customRangeTab && dateRangePicker) {
+    customRangeTab.addEventListener("click", function() {
+      document.querySelectorAll(".period-tab").forEach(function(t) { t.classList.remove("active"); });
+      customRangeTab.classList.add("active");
+      dateRangePicker.classList.add("visible");
+    });
+    if (customRangeTab.classList.contains("active")) {
+      dateRangePicker.classList.add("visible");
+    }
+  }
 
   // --- Allergen CRUD ---
   var allergenForm = document.getElementById("allergen-form");
@@ -249,7 +283,7 @@
           await api("POST", "/api/medications", body);
           toast("Added");
         }
-        setTimeout(function() { location.reload(); }, 500);
+        setTimeout(function() { reloadMedPage(); }, 500);
       } catch(e) { toast(e.message, "error"); }
     });
   }
@@ -260,7 +294,7 @@
       try {
         await api("DELETE", "/api/medications/" + this.dataset.id);
         toast("Discontinued");
-        setTimeout(function() { location.reload(); }, 500);
+        setTimeout(function() { reloadMedPage(); }, 500);
       } catch(e) { toast(e.message, "error"); }
     });
   });

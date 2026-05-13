@@ -19,7 +19,8 @@ import { getToday } from "../utils/clock";
 
 const CATEGORIES = [
   { name: "Fitness", icon: "fitness", metrics: ["steps", "active_energy_kcal"] },
-  { name: "Sleep", icon: "sleep", metrics: ["sleep_hours", "sleep_quality"] },
+  { name: "Sleep", icon: "sleep", metrics: ["sleep_hours", "sleep_quality", "light_sleep_hours", "deep_sleep_hours", "rem_sleep_hours"] },
+  { name: "Activity", icon: "activity", metrics: ["low_intensity_min", "medium_intensity_min", "high_intensity_min", "total_activity_min"] },
   { name: "Heart", icon: "heart", metrics: ["resting_heart_rate_bpm", "avg_heart_rate_bpm"] },
   { name: "Body", icon: "body", metrics: ["weight_kg", "body_fat_percent"] },
   { name: "Blood Oxygen", icon: "oxygen", metrics: ["blood_oxygen_percent"] },

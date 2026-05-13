@@ -1,7 +1,7 @@
 /** @jsxImportSource hono/jsx */
 import type { OpenAPIApp } from "mock-lib";
 import { initDb } from "../db";
-import { getToday } from "../utils/clock";
+import { getToday, getCurrentTime } from "../utils/clock";
 
 function Layout({ title, today, children }: { title: string; today?: string; children: any }) {
   return (
@@ -45,6 +45,13 @@ const METRIC_LABELS: Record<string, { label: string; unit: string; icon: string 
   active_energy_kcal: { label: "Active Energy", unit: "kcal", icon: "🔥" },
   sleep_hours: { label: "Sleep Duration", unit: "hrs", icon: "😴" },
   sleep_quality: { label: "Sleep Quality", unit: "%", icon: "💤" },
+  light_sleep_hours: { label: "Light Sleep", unit: "h", icon: "🌙" },
+  deep_sleep_hours: { label: "Deep Sleep", unit: "h", icon: "🌊" },
+  rem_sleep_hours: { label: "REM Sleep", unit: "h", icon: "👁" },
+  low_intensity_min: { label: "Low Intensity", unit: "min", icon: "🚶" },
+  medium_intensity_min: { label: "Med Intensity", unit: "min", icon: "🏃" },
+  high_intensity_min: { label: "High Intensity", unit: "min", icon: "🏋" },
+  total_activity_min: { label: "Total Activity", unit: "min", icon: "⏱" },
   resting_heart_rate_bpm: { label: "Resting HR", unit: "bpm", icon: "❤️" },
   avg_heart_rate_bpm: { label: "Avg HR", unit: "bpm", icon: "💓" },
   weight_kg: { label: "Weight", unit: "kg", icon: "⚖️" },
@@ -54,7 +61,8 @@ const METRIC_LABELS: Record<string, { label: string; unit: string; icon: string 
 
 const CATEGORIES = [
   { name: "Fitness", icon: "🏃", metrics: ["steps", "active_energy_kcal"] },
-  { name: "Sleep", icon: "😴", metrics: ["sleep_hours", "sleep_quality"] },
+  { name: "Sleep", icon: "😴", metrics: ["sleep_hours", "sleep_quality", "light_sleep_hours", "deep_sleep_hours", "rem_sleep_hours"] },
+  { name: "Activity", icon: "⏱", metrics: ["low_intensity_min", "medium_intensity_min", "high_intensity_min", "total_activity_min"] },
   { name: "Heart", icon: "❤️", metrics: ["resting_heart_rate_bpm", "avg_heart_rate_bpm"] },
   { name: "Body", icon: "⚖️", metrics: ["weight_kg", "body_fat_percent"] },
   { name: "Vitals", icon: "🫁", metrics: ["blood_oxygen_percent"] },
@@ -82,16 +90,34 @@ export function registerFrontendRoutes(app: OpenAPIApp) {
       "SELECT * FROM health_daily_snapshot WHERE user_id = 1 AND date = ?"
     ).get(queryDate) as any;
 
+    const nowTime = getCurrentTime(); // HH:MM from DB
     const meds = db.query(
       "SELECT * FROM medication WHERE user_id = 1 AND archived = 0"
     ).all() as any[];
     const medsWithSlots = meds.map((m: any) => {
-      const slots = db.query("SELECT * FROM medication_intake_slot WHERE medication_id = ?").all(m.id);
+      const slots = db.query("SELECT * FROM medication_intake_slot WHERE medication_id = ? ORDER BY time_hhmm ASC").all(m.id) as any[];
       const logs = db.query(
         "SELECT * FROM medication_dose_log WHERE medication_id = ? AND logged_at >= ? ORDER BY logged_at DESC"
       ).all(m.id, queryDate) as any[];
-      return { ...m, slots, todayLogs: logs };
+      // next upcoming slot for this med
+      const upcoming = slots.find((s: any) => s.time_hhmm >= nowTime);
+      const nextSlot = upcoming ?? (slots.length > 0 ? slots[0] : null);
+      const nextTime = nextSlot ? nextSlot.time_hhmm : null;
+      const nextIsToday = upcoming != null;
+      return { ...m, slots, todayLogs: logs, nextSlot, nextTime, nextIsToday };
     });
+
+    // Find the earliest next time across all meds, then pick up to 3 meds at that time
+    const timesWithMeds = medsWithSlots.filter((m: any) => m.nextTime);
+    // prefer today's upcoming; if none, fall back to tomorrow
+    const todayUpcoming = timesWithMeds.filter((m: any) => m.nextIsToday);
+    const pool = todayUpcoming.length > 0 ? todayUpcoming : timesWithMeds;
+    const earliestTime = pool.length > 0
+      ? pool.reduce((min: string, m: any) => m.nextTime < min ? m.nextTime : min, pool[0].nextTime)
+      : null;
+    const nextMeds = earliestTime
+      ? pool.filter((m: any) => m.nextTime === earliestTime).slice(0, 3)
+      : [];
 
     const allergenCount = (db.query("SELECT COUNT(*) as c FROM allergen WHERE user_id = 1 AND archived = 0").get() as any).c;
     const allergens = db.query(
@@ -126,6 +152,13 @@ export function registerFrontendRoutes(app: OpenAPIApp) {
             <a href="/health/active_energy_kcal" class="metric-card-link"><MetricCard icon="🔥" label="Active Energy" value={snapshot.active_energy_kcal} unit="kcal" /></a>
             <a href="/health/sleep_hours" class="metric-card-link"><MetricCard icon="😴" label="Sleep" value={snapshot.sleep_hours} unit="hrs" /></a>
             <a href="/health/sleep_quality" class="metric-card-link"><MetricCard icon="💤" label="Sleep Quality" value={snapshot.sleep_quality} unit="%" /></a>
+            <a href="/health/light_sleep_hours" class="metric-card-link"><MetricCard icon="🌙" label="Light Sleep" value={snapshot.light_sleep_hours} unit="h" /></a>
+            <a href="/health/deep_sleep_hours" class="metric-card-link"><MetricCard icon="🌊" label="Deep Sleep" value={snapshot.deep_sleep_hours} unit="h" /></a>
+            <a href="/health/rem_sleep_hours" class="metric-card-link"><MetricCard icon="👁" label="REM Sleep" value={snapshot.rem_sleep_hours} unit="h" /></a>
+            <a href="/health/low_intensity_min" class="metric-card-link"><MetricCard icon="🚶" label="Low Intensity" value={snapshot.low_intensity_min} unit="min" /></a>
+            <a href="/health/medium_intensity_min" class="metric-card-link"><MetricCard icon="🏃" label="Med Intensity" value={snapshot.medium_intensity_min} unit="min" /></a>
+            <a href="/health/high_intensity_min" class="metric-card-link"><MetricCard icon="🏋" label="High Intensity" value={snapshot.high_intensity_min} unit="min" /></a>
+            <a href="/health/total_activity_min" class="metric-card-link"><MetricCard icon="⏱" label="Total Activity" value={snapshot.total_activity_min} unit="min" /></a>
             <a href="/health/resting_heart_rate_bpm" class="metric-card-link"><MetricCard icon="❤️" label="Resting HR" value={snapshot.resting_heart_rate_bpm} unit="bpm" /></a>
             <a href="/health/avg_heart_rate_bpm" class="metric-card-link"><MetricCard icon="💓" label="Avg HR" value={snapshot.avg_heart_rate_bpm} unit="bpm" /></a>
             <a href="/health/weight_kg" class="metric-card-link"><MetricCard icon="⚖️" label="Weight" value={snapshot.weight_kg} unit="kg" /></a>
@@ -142,7 +175,7 @@ export function registerFrontendRoutes(app: OpenAPIApp) {
           <div class="section">
             <div class="section-header">
               <h2>7-Day Trends</h2>
-              <a href="/browse" class="btn btn-sm">Details</a>
+              <a href="/browse" class="btn btn-sm">View Details</a>
             </div>
             <div class="week-summary">
               <div class="week-chart" id="week-steps-chart" data-values={JSON.stringify(weekSnapshots.map((s: any) => s.steps))} data-labels={JSON.stringify(weekSnapshots.map((s: any) => s.date.slice(5)))} data-metric="Steps"></div>
@@ -154,39 +187,49 @@ export function registerFrontendRoutes(app: OpenAPIApp) {
 
         <div class="section">
           <div class="section-header">
-            <h2>Today's Medications</h2>
+            <h2>Next Medication</h2>
             <a href="/medications" class="btn btn-sm">Manage</a>
           </div>
-          {medsWithSlots.length === 0 ? (
-            <div class="empty-state"><p>No medications recorded</p></div>
+          {nextMeds.length === 0 ? (
+            <div class="empty-state"><p>No upcoming medications</p></div>
           ) : (
             <div class="med-list">
-              {medsWithSlots.map((m: any) => (
-                <div class="med-card" key={m.id}>
-                  <div class="med-header">
-                    <strong>{m.display_name || m.name}</strong>
-                    <span class={`freq-badge freq-${m.frequency}`}>{m.frequency === "daily" ? "Daily" : m.frequency === "every_two_days" ? "Every Two Days" : m.frequency === "weekly" ? "Weekly" : m.frequency === "monthly" ? "Monthly" : m.frequency === "as_needed" ? "As Needed" : "Other"}</span>
-                  </div>
-                  {(m.slots as any[]).map((s: any) => {
-                    const logged = (m.todayLogs as any[]).some((l: any) => l.slot_id === s.id);
-                    return (
-                      <div class={`slot-row ${logged ? "slot-taken" : ""}`} key={s.id}>
-                        <span class="slot-time">{s.time_hhmm}</span>
-                        <span class="slot-dose">{s.dose_amount} {s.dose_unit}</span>
-                        {s.label && <span class="slot-label">{s.label}</span>}
-                        {logged ? (
+              <div class="next-med-time">
+                <span class="reminder-icon">⏰</span>
+                <span>{earliestTime} {nextMeds[0].nextIsToday ? "today" : "tomorrow"}</span>
+              </div>
+              {nextMeds.map((m: any) => {
+                const slot = m.nextSlot;
+                const logEntry = (m.todayLogs as any[]).find((l: any) => l.slot_id === slot.id);
+                const logged = !!logEntry;
+                return (
+                  <div class="med-card" key={m.id}>
+                    <div class="med-header">
+                      <strong>{m.display_name || m.name}</strong>
+                      <span class={`freq-badge freq-${m.frequency}`}>{m.frequency === "daily" ? "Daily" : m.frequency === "every_two_days" ? "Every Two Days" : m.frequency === "weekly" ? "Weekly" : m.frequency === "monthly" ? "Monthly" : m.frequency === "as_needed" ? "As Needed" : "Other"}</span>
+                    </div>
+                    <div class={`slot-row ${logged ? "slot-taken" : ""}`}>
+                      <span class="slot-time">{slot.time_hhmm}</span>
+                      <span class="slot-dose">{slot.dose_amount} {slot.dose_unit}</span>
+                      {slot.label && <span class="slot-label">{slot.label}</span>}
+                      {logged ? (
+                        <div class="slot-actions">
                           <span class="status-badge taken">Taken</span>
-                        ) : (
-                          <button class="btn btn-sm btn-primary log-dose-btn"
-                            data-med-id={m.id} data-slot-id={s.id}>
-                            Log
+                          <button class="btn btn-sm btn-danger cancel-dose-btn"
+                            data-med-id={m.id} data-log-id={logEntry.id}>
+                            Cancel
                           </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              ))}
+                        </div>
+                      ) : (
+                        <button class="btn btn-sm btn-primary log-dose-btn"
+                          data-med-id={m.id} data-slot-id={slot.id}>
+                          Log
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -270,13 +313,39 @@ export function registerFrontendRoutes(app: OpenAPIApp) {
     const today = getToday();
     const daysParam = c.req.query("days") || "7";
     const days = parseInt(daysParam, 10) || 7;
-    const startDate = shiftDate(today, -(days - 1));
+    const startDateParam = c.req.query("start_date") || "";
+    const endDateParam = c.req.query("end_date") || "";
+
+    let startDate: string;
+    let endDate: string;
+    let customRange = false;
+
+    if (startDateParam && endDateParam) {
+      startDate = startDateParam;
+      endDate = endDateParam;
+      customRange = true;
+    } else {
+      endDate = today;
+      startDate = shiftDate(today, -(days - 1));
+    }
 
     const rows = db.query(
       "SELECT date, value FROM health_metric_series WHERE user_id = 1 AND metric_type = ? AND date >= ? AND date <= ? ORDER BY date"
-    ).all(metricType, startDate, today) as { date: string; value: number }[];
+    ).all(metricType, startDate, endDate) as { date: string; value: number }[];
 
-    // Compute stats
+    // For ranges > 30 days, chart shows only last 30 days but stats use full range
+    const MAX_CHART_DAYS = 30;
+    let chartRows = rows;
+    let chartLimited = false;
+    if (customRange) {
+      const rangeSpanDays = Math.floor((new Date(endDate).getTime() - new Date(startDate).getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      if (rangeSpanDays > MAX_CHART_DAYS || rows.length > MAX_CHART_DAYS) {
+        chartRows = rows.slice(Math.max(0, rows.length - MAX_CHART_DAYS));
+        chartLimited = true;
+      }
+    }
+
+    // Compute stats from ALL rows (full range)
     let stats = { mean: 0, min: 0, max: 0, trend: "stable" as string, insight: "" };
     if (rows.length > 0) {
       const values = rows.map(r => r.value);
@@ -291,11 +360,12 @@ export function registerFrontendRoutes(app: OpenAPIApp) {
         const change = ((secondHalf - firstHalf) / firstHalf) * 100;
         stats.trend = change > 5 ? "rising" : change < -5 ? "falling" : "stable";
       }
+      const rangeLabel = customRange ? `${startDate} to ${endDate}` : `the past ${days} days`;
       stats.insight = stats.trend === "rising"
-        ? `${meta.label} has been rising over the past ${days} days, averaging ${stats.mean}${meta.unit ? " " + meta.unit : ""}`
+        ? `${meta.label} has been rising over ${rangeLabel}, averaging ${stats.mean}${meta.unit ? " " + meta.unit : ""}`
         : stats.trend === "falling"
-          ? `${meta.label} has been falling over the past ${days} days, averaging ${stats.mean}${meta.unit ? " " + meta.unit : ""}`
-          : `${meta.label} has been stable over the past ${days} days, averaging ${stats.mean}${meta.unit ? " " + meta.unit : ""}`;
+          ? `${meta.label} has been falling over ${rangeLabel}, averaging ${stats.mean}${meta.unit ? " " + meta.unit : ""}`
+          : `${meta.label} has been stable over ${rangeLabel}, averaging ${stats.mean}${meta.unit ? " " + meta.unit : ""}`;
     }
 
     return c.html(
@@ -306,18 +376,30 @@ export function registerFrontendRoutes(app: OpenAPIApp) {
         </div>
 
         <div class="period-tabs">
-          <a href={`/health/${metricType}?days=7`} class={`period-tab ${days === 7 ? "active" : ""}`}>7 Days</a>
-          <a href={`/health/${metricType}?days=14`} class={`period-tab ${days === 14 ? "active" : ""}`}>14 Days</a>
-          <a href={`/health/${metricType}?days=30`} class={`period-tab ${days === 30 ? "active" : ""}`}>30 Days</a>
+          <a href={`/health/${metricType}?days=7`} class={`period-tab ${!customRange && days === 7 ? "active" : ""}`}>7 Days</a>
+          <a href={`/health/${metricType}?days=14`} class={`period-tab ${!customRange && days === 14 ? "active" : ""}`}>14 Days</a>
+          <a href={`/health/${metricType}?days=30`} class={`period-tab ${!customRange && days === 30 ? "active" : ""}`}>30 Days</a>
+          <span class={`period-tab ${customRange ? "active" : ""}`} id="custom-range-tab">Custom</span>
+        </div>
+
+        <div class={`date-range-picker ${customRange ? "visible" : ""}`} id="date-range-picker">
+          <form method="get" action={`/health/${metricType}`} class="date-range-form">
+            <label>Start: <input type="date" name="start_date" value={startDate} /></label>
+            <label>End: <input type="date" name="end_date" value={endDate} /></label>
+            <button type="submit" class="btn btn-sm btn-primary">Apply</button>
+          </form>
         </div>
 
         {rows.length > 0 ? (
           <div class="detail-content">
             <div class="chart-container">
               <div class="bar-chart" id="detail-chart"
-                data-values={JSON.stringify(rows.map(r => r.value))}
-                data-labels={JSON.stringify(rows.map(r => r.date.slice(5)))}
+                data-values={JSON.stringify(chartRows.map(r => r.value))}
+                data-labels={JSON.stringify(chartRows.map(r => r.date.slice(5)))}
                 data-unit={meta.unit}></div>
+              {chartLimited && (
+                <div class="chart-limit-notice">Only showing the most recent 30 days in the chart. Statistics below reflect the full selected range ({rows.length} days).</div>
+              )}
             </div>
 
             <div class="stats-grid">
@@ -451,19 +533,68 @@ export function registerFrontendRoutes(app: OpenAPIApp) {
   app.get("/medications", (c) => {
     const db = initDb();
     const today = getToday();
+    const sortBy = c.req.query("sort") || "time";
+
     const meds = db.query(
       "SELECT * FROM medication WHERE user_id = 1 AND archived = 0 ORDER BY id DESC"
     ).all() as any[];
     const medsWithSlots = meds.map((m: any) => {
-      const slots = db.query("SELECT * FROM medication_intake_slot WHERE medication_id = ?").all(m.id);
+      const slots = db.query("SELECT * FROM medication_intake_slot WHERE medication_id = ? ORDER BY time_hhmm ASC").all(m.id) as any[];
       return { ...m, slots };
     });
+
+    // Sort medications
+    const nowTime = getCurrentTime(); // HH:MM
+    const freqOrder: Record<string, number> = {
+      daily: 0, every_two_days: 1, weekly: 2, monthly: 3, as_needed: 4, other: 5,
+    };
+    if (sortBy === "name") {
+      medsWithSlots.sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
+    } else {
+      // Sort by: frequency group (daily first), then next upcoming slot time
+      function getNextSlotKey(med: any): string {
+        const freq = freqOrder[med.frequency] ?? 5;
+        const freqPrefix = String(freq);
+        // Future start_date: not active yet, sort after all active meds in same freq group
+        if (med.start_date > today) {
+          return freqPrefix + ":F:" + med.start_date + ":" + (med.slots.length > 0 ? med.slots[0].time_hhmm : "99:99");
+        }
+        const slots = med.slots as any[];
+        if (slots.length === 0) return freqPrefix + ":E:99:99";
+        const future = slots.filter((s: any) => s.time_hhmm > nowTime);
+        if (future.length > 0) return freqPrefix + ":A:" + future[0].time_hhmm;
+        // All slots passed today — next is tomorrow's earliest
+        return freqPrefix + ":B:" + slots[0].time_hhmm;
+      }
+      medsWithSlots.sort((a: any, b: any) => {
+        const ta = getNextSlotKey(a);
+        const tb = getNextSlotKey(b);
+        if (ta !== tb) return ta.localeCompare(tb);
+        return (a.name || "").localeCompare(b.name || "");
+      });
+    }
+
+    // Compute next reminder time for each medication
+    function getNextReminder(med: any): string | null {
+      const slots = med.slots as any[];
+      if (slots.length === 0) return null;
+      if (med.start_date > today) return med.start_date + " " + slots[0].time_hhmm;
+      const future = slots.filter((s: any) => s.time_hhmm > nowTime);
+      if (future.length > 0) return future[0].time_hhmm + " today";
+      return slots[0].time_hhmm + " tomorrow";
+    }
 
     return c.html(
       <Layout title="Medications" today={today}>
         <div class="page-header">
           <h1>Medications</h1>
           <button class="btn btn-primary" id="add-med-btn">Add Medication</button>
+        </div>
+
+        <div class="sort-controls">
+          <span>Sort by:</span>
+          <a href="/medications?sort=name" class={`btn btn-sm ${sortBy === "name" ? "btn-primary" : ""}`}>Name</a>
+          <a href="/medications?sort=time" class={`btn btn-sm ${sortBy === "time" ? "btn-primary" : ""}`}>Time</a>
         </div>
 
         <div id="med-form" class="form-card hidden">
@@ -559,6 +690,12 @@ export function registerFrontendRoutes(app: OpenAPIApp) {
                   <span>Started {m.start_date}</span>
                   {m.end_date && <span>Until {m.end_date}</span>}
                 </div>
+                {getNextReminder(m) && (
+                  <div class="next-reminder">
+                    <span class="reminder-icon">⏰</span>
+                    <span>Next: {getNextReminder(m)}</span>
+                  </div>
+                )}
                 {m.notes && <p class="med-notes">{m.notes}</p>}
                 {(m.slots as any[]).length > 0 && (
                   <div class="slots-display">
