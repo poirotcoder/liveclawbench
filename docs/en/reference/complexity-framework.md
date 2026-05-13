@@ -60,6 +60,7 @@ single, clean environment without structural complexity.
 |      28 | mixed-tool-memory                 |     E      | ✓  |    |    | ✓  | Documents & Knowledge      |
 |      29 | live-web-research-sqlite-fts5     |     M      | ✓  |    |    | ✓  | Deep Research & Report     |
 |      31 | mint-diet-snack-log               |     E      |    |    |    |    | Health & Fitness           |
+|     112 | health-daily-record               |     E      |    |    |    |    | Health & Wellness          |
 
 ---
 
