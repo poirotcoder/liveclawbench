@@ -37,6 +37,7 @@ const BINARY_PORTS: Record<string, number> = {
   shop: 1234,
   todolist: 5002,
   "doc-search": 8123,
+  "mint-diet": 5003,
 };
 
 function portProxyLines(listenPort: number, targetPort: number): string[] {
@@ -80,7 +81,7 @@ const ALL_TASK_NAMES = new Set([
   "skill-creation", "skill-repository-curation", "skill-supplementation",
   "skill-conflict-resolution", "skill-dependency-fix", "noise-filtering",
   "mixed-tool-memory", "incremental-update-ctp", "live-web-research-sqlite-fts5",
-  "conflict-repair-acb", "skill-combination",
+  "conflict-repair-acb", "skill-combination", "mint-diet-snack-log",
 ]);
 
 interface AssetMapping {
