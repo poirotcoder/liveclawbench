@@ -13,7 +13,7 @@ import appJs from "../public/app.js" with { type: "text" };
 
 export function createHealthApp(): MockAppV2 {
   const mockApp = createOpenAPIMockApp(
-    { name: "health", port: 5003 },
+    { name: "health", port: 5007 },
     { title: "Health Mock API", version: "1.0.0" },
   );
 
