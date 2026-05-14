@@ -66,6 +66,7 @@ single, clean environment without structural complexity.
 |      35 | expense-draft-delete              |     E      |    |    |    |    | Finance & Data Analytics   |
 |      36 | insurance-deductible-selection    |     E      |    |    |    |    | E-commerce & Daily Svcs    |
 |      37 | health-insurance-optimization     |     M      | ✓  |    |    |    | E-commerce & Daily Svcs    |
+|      38 | health-daily-record               |     E      |    |    |    |    | Health & Wellness          |
 
 ---
 
